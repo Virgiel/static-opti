@@ -1,0 +1,25 @@
+[package]
+name = "static-opti"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Very fast deflate
+libdeflater = "0.7"
+# Brotli
+brotli = "3.3"
+# Fast hash
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+# Fast base 64
+base64 = "0.13"
+# JSON
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# Memory map
+memmap2 = "0.5"
+# Fast hash map
+hashbrown = "0.11"
+# Efficient status line
+status-line = { git = "https://github.com/Virgiel/status-line" }
+# Parallelisation
+rayon = "1.5"

@@ -23,3 +23,10 @@ hashbrown = "0.11"
 status-line = { git = "https://github.com/Virgiel/status-line" }
 # Parallelisation
 rayon = "1.5"
+# Small and performant allocator
+mimalloc = { version = "0.1", default-features = false }
+
+# Optimal size and perf
+[profile.release]
+opt-level = 3
+lto = "thin"

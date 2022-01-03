@@ -7,9 +7,13 @@ use std::{
 };
 
 use libdeflater::{CompressionLvl, Compressor};
+use mimalloc::MiMalloc;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use static_opti::Item;
 use status_line::StatusLine;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 fn main() {
     let start = Instant::now();

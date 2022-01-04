@@ -22,7 +22,7 @@ fn main() {
     let out_dir = std::env::args().nth(2).unwrap();
     let out_dir = PathBuf::from(out_dir);
     let mut entries = Vec::new();
-    std::fs::remove_dir_all(&out_dir).unwrap();
+    std::fs::remove_dir_all(&out_dir).ok();
     std::fs::create_dir_all(&out_dir).unwrap();
 
     walk(&in_dir, &mut entries);

@@ -75,7 +75,7 @@ fn main() {
 /// Format byte size in an human readable format
 fn format_size(mut size: f32) -> String {
     for symbol in &[" B", "kB", "MB", "GB", "TB"] {
-        if size < 1024. {
+        if size < 1000. {
             return format!("{:.1}{}", size, symbol);
         } else {
             size /= 1024.;

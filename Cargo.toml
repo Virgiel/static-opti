@@ -18,7 +18,7 @@ serde_json = "1.0"
 # Memory map
 memmap2 = "0.5"
 # Fast hash map
-hashbrown = "0.11"
+hashbrown = "0.12"
 # Parallelisation
 rayon = "1.5"
 # Small and performant allocator

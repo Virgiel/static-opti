@@ -62,11 +62,19 @@ impl FilesService {
             return Some(self.match_item(accept_encoding, it));
         }
 
-        let path = if path == "" {
-            "index.html".to_string()
-        } else {
-            format!("{}/index.html", path)
-        };
+        {
+            let path = if path == "" {
+                "index.html".to_string()
+            } else {
+                format!("{}/index.html", path)
+            };
+
+            if let Some(it) = self.map.get(&path) {
+                return Some(self.match_item(accept_encoding, it));
+            }
+        }
+
+        let path = format!("{}.html", path);
 
         if let Some(it) = self.map.get(&path) {
             return Some(self.match_item(accept_encoding, it));
@@ -124,6 +132,7 @@ pub fn compress_merge(in_dir: impl AsRef<Path>, out_file: impl AsRef<Path>) -> V
                 .unwrap()
                 .to_string()
                 .replace("\\", "/");
+            let path = path.trim_matches('/').to_string();
             // Gzip compress
             let mut compressor = Compressor::new(CompressionLvl::best());
             let max_size = compressor.gzip_compress_bound(plain.len());

@@ -1,13 +1,14 @@
 use std::{
-    io::{BufWriter, Write},
+    io::{BufWriter, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use brotli::CompressorWriter;
 use hashbrown::HashMap;
 use libdeflater::{CompressionLvl, Compressor};
 use memmap2::Mmap;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use tempfile::NamedTempFile;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Item {
@@ -62,16 +63,14 @@ impl FilesService {
             return Some(self.match_item(accept_encoding, it));
         }
 
-        {
-            let path = if path == "" {
-                "index.html".to_string()
-            } else {
-                format!("{}/index.html", path)
-            };
+        let path = if path == "" {
+            "index.html".to_string()
+        } else {
+            format!("{}/index.html", path)
+        };
 
-            if let Some(it) = self.map.get(&path) {
-                return Some(self.match_item(accept_encoding, it));
-            }
+        if let Some(it) = self.map.get(&path) {
+            return Some(self.match_item(accept_encoding, it));
         }
 
         let path = format!("{}.html", path);
@@ -95,6 +94,34 @@ impl FilesService {
     }
 }
 
+struct StaticQueue<T> {
+    items: Vec<T>,
+    pos: AtomicUsize,
+}
+
+impl<T> StaticQueue<T> {
+    pub fn new(items: Vec<T>) -> Self {
+        Self {
+            pos: AtomicUsize::new(items.len()),
+            items,
+        }
+    }
+
+    pub fn next(&self) -> Option<&T> {
+        let pos = self
+            .pos
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v| {
+                Some(v.saturating_sub(1))
+            })
+            .unwrap();
+        if pos > 0 {
+            Some(&self.items[pos - 1])
+        } else {
+            None
+        }
+    }
+}
+
 /// Extract supported encoding and corresponding tag
 fn match_encoding_tag<'a>(
     accept_encoding: &str,
@@ -113,66 +140,129 @@ fn match_encoding_tag<'a>(
     (None, &item.plain)
 }
 
-pub fn compress_merge(in_dir: impl AsRef<Path>, out_file: impl AsRef<Path>) -> Vec<Item> {
-    let mut entries = Vec::new();
+type CompressedFile = (String, Vec<u8>, Option<Vec<u8>>, Option<Vec<u8>>);
 
-    let in_dir = in_dir.as_ref();
-    walk(in_dir, &mut entries);
-    // Parallel compression
-    let compressed: Vec<_> = entries
-        .par_iter()
-        .map(|p| {
-            // Read plain file
-            let plain = std::fs::read(&p).unwrap();
-            // Format path
-            let path = p
-                .strip_prefix(in_dir)
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string()
-                .replace("\\", "/");
-            let path = path.trim_matches('/').to_string();
-            // Gzip compress
-            let mut compressor = Compressor::new(CompressionLvl::best());
-            let max_size = compressor.gzip_compress_bound(plain.len());
-            let mut gzip = vec![0; max_size];
-            let gzip_size = compressor.gzip_compress(&plain, &mut gzip).unwrap();
-            gzip.resize(gzip_size, 0);
-            let gzip = (gzip.len() * 100 / plain.len() < 90).then(|| (etag(&gzip), gzip));
+struct Accumulator {
+    writer: BufWriter<NamedTempFile>,
+    items: Vec<Item>,
+    count: u64,
+}
 
-            // Brotli compress
-            let mut brotli = Vec::new();
-            let mut writer = CompressorWriter::new(&mut brotli, 4096, 11, 24);
-            writer.write_all(&plain).unwrap();
-            writer.flush().unwrap();
-            writer.into_inner();
-            let brotli = (brotli.len() * 100 / plain.len() < 90).then(|| (etag(&brotli), brotli));
+impl Accumulator {
+    pub fn new() -> Self {
+        Self {
+            writer: BufWriter::new(NamedTempFile::new().unwrap()),
+            items: vec![],
+            count: 0,
+        }
+    }
 
-            (path, (etag(&plain), plain), gzip, brotli)
-        })
-        .collect();
+    pub fn append(&mut self, content: &[u8]) -> (u64, u32) {
+        let start = self.count;
+        self.count += content.len() as u64;
+        self.writer.write_all(content).unwrap();
+        (start, content.len() as u32)
+    }
 
-    // Write
-    let mut writer = BufWriter::new(std::fs::File::create(out_file).unwrap());
-    let mut count = 0;
-    let mut append = |content: &[u8]| {
-        let start = count;
-        count += content.len();
-        writer.write_all(&content).unwrap();
-        (start as u64, content.len() as u32)
-    };
-    let items: Vec<_> = compressed
-        .into_iter()
-        .map(|(path, (etag, plain), gzip, brotli)| Item {
+    pub fn add(&mut self, file: CompressedFile) {
+        let (path, content, gzip, brotli) = file;
+        let item = Item {
             path,
-            plain: (etag, append(&plain)),
-            gzip: gzip.map(|(etag, gzip)| (etag, append(&gzip))),
-            brotli: brotli.map(|(etag, brotli)| (etag, append(&brotli))),
-        })
-        .collect();
-    writer.flush().unwrap();
-    items
+            plain: (etag(&content), self.append(&content)),
+            gzip: gzip.map(|content| (etag(&content), self.append(&content))),
+            brotli: brotli.map(|content| (etag(&content), self.append(&content))),
+        };
+        self.items.push(item);
+    }
+
+    pub fn concat(mut self, other: Self) -> Self {
+        // Copy items with new pos;
+        self.items.extend(other.items.into_iter().map(|mut item| {
+            item.plain.1 .0 += self.count;
+            item.gzip.iter_mut().for_each(|it| it.1 .0 += self.count);
+            item.brotli.iter_mut().for_each(|it| it.1 .0 += self.count);
+            return item;
+        }));
+        // Copy other file from start
+        let mut file = other.writer.into_inner().unwrap();
+        file.seek(SeekFrom::Start(0)).unwrap();
+        std::io::copy(&mut file, &mut self.writer).unwrap();
+        // Increment count
+        self.count += other.count;
+        return self;
+    }
+
+    pub fn persist(self, path: &Path) -> Vec<Item> {
+        let file = self.writer.into_inner().unwrap();
+        file.persist(path).unwrap();
+        self.items
+    }
+}
+
+pub fn compress(p: &Path, in_dir: &Path) -> CompressedFile {
+    // Read plain file
+    let plain = std::fs::read(&p).unwrap();
+    // Format path
+    let path = p
+        .strip_prefix(in_dir)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .replace("\\", "/"); // Normalized path separator
+
+    if plain.is_empty() {
+        (path, plain, None, None)
+    } else {
+        // Gzip compress
+        let mut compressor = Compressor::new(CompressionLvl::best());
+        let max_size = compressor.gzip_compress_bound(plain.len());
+        let mut gzip = vec![0; max_size];
+        let gzip_size = compressor.gzip_compress(&plain, &mut gzip).unwrap();
+        gzip.resize(gzip_size, 0);
+        let gzip = (gzip.len() * 100 / plain.len() < 90).then(|| gzip);
+
+        // Brotli compress
+        let mut brotli = Vec::new();
+        let mut writer = CompressorWriter::new(&mut brotli, 4096, 11, 24);
+        writer.write_all(&plain).unwrap();
+        writer.flush().unwrap();
+        writer.into_inner();
+        let brotli = (brotli.len() * 100 / plain.len() < 90).then(|| brotli);
+
+        (path, plain, gzip, brotli)
+    }
+}
+
+pub fn compress_merge(in_dir: impl AsRef<Path>, out_file: impl AsRef<Path>) -> Vec<Item> {
+    let in_dir = in_dir.as_ref();
+    let mut entries = Vec::new();
+    walk(in_dir, &mut entries);
+    let queue = StaticQueue::new(entries);
+    // Parallel compression
+    let merged = crossbeam::thread::scope(|s| {
+        let accs: Vec<_> = (0..std::thread::available_parallelism().unwrap().get())
+            .into_iter()
+            .map(|_| {
+                let queue = &queue;
+                s.spawn(move |_| {
+                    let mut acc = Accumulator::new();
+                    while let Some(path) = queue.next() {
+                        acc.add(compress(&path, &in_dir))
+                    }
+                    return acc;
+                })
+            })
+            .collect();
+        // Merge
+        accs.into_iter()
+            .map(|it| it.join().unwrap())
+            .reduce(|a, b| a.concat(b))
+            .unwrap_or_else(|| Accumulator::new())
+    })
+    .unwrap();
+
+    // Persist
+    merged.persist(out_file.as_ref())
 }
 
 /// Generate strong etag from bytes

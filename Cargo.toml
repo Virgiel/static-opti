@@ -10,7 +10,7 @@ libdeflater = "0.7"
 brotli = "3.3"
 # Fast hash
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
-# Fast base 64
+# Fast base 6n
 base64 = "0.13"
 # JSON
 serde = { version = "1.0", features = ["derive"] }
@@ -19,10 +19,12 @@ serde_json = "1.0"
 memmap2 = "0.5"
 # Fast hash map
 hashbrown = "0.12"
-# Parallelisation
-rayon = "1.5"
 # Small and performant allocator
 mimalloc = { version = "0.1", default-features = false }
+# Temporary file
+tempfile = "3.3.0"
+# Concurrency utils
+crossbeam = "0.8.1"
 
 # Optimal size and perf
 [profile.release]

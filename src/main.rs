@@ -16,7 +16,8 @@ fn main() {
     std::fs::create_dir_all(&out_dir).unwrap();
 
     let out_file = out_dir.join("out.static");
-    let items = compress_merge(in_dir, &out_file);
+    let mut items = compress_merge(in_dir, &out_file);
+    items.sort_unstable_by(|a, b| a.path.cmp(&b.path));
     // Write report
     std::fs::write(
         out_dir.join("report.json"),
@@ -34,7 +35,7 @@ fn main() {
         "Name",
         "",
         max,
-        max + 26
+        max + 34
     )
     .unwrap();
     for item in &items {
@@ -53,7 +54,7 @@ fn main() {
                     &mut stdout,
                     "{:>7} {}%  ",
                     format_size(*len as f32),
-                    (len * 100 / plain),
+                    (100 - (len * 100 / plain)),
                 )
                 .unwrap();
             } else {

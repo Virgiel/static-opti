@@ -63,14 +63,16 @@ impl FilesService {
             return Some(self.match_item(accept_encoding, it));
         }
 
-        let path = if path == "" {
-            "index.html".to_string()
-        } else {
-            format!("{}/index.html", path)
-        };
+        {
+            let path = if path == "" {
+                "index.html".to_string()
+            } else {
+                format!("{}/index.html", path)
+            };
 
-        if let Some(it) = self.map.get(&path) {
-            return Some(self.match_item(accept_encoding, it));
+            if let Some(it) = self.map.get(&path) {
+                return Some(self.match_item(accept_encoding, it));
+            }
         }
 
         let path = format!("{}.html", path);

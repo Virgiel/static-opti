@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Very fast deflate
-libdeflater = "0.7"
+libdeflater = "0.8"
 # Brotli
 brotli = "3.3"
 # Fast hash

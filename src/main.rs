@@ -1,29 +1,17 @@
-use std::{io::Write, path::PathBuf, time::Instant};
+use std::{io::Write, time::Instant};
 
 use mimalloc::MiMalloc;
-use static_opti::compress_merge;
+use static_opti::optimize;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
 fn main() {
     let start = Instant::now();
-    let in_dir = std::env::args().nth(1).unwrap();
-    let in_dir = PathBuf::from(in_dir);
-    let out_dir = std::env::args().nth(2).unwrap();
-    let out_dir = PathBuf::from(out_dir);
-    std::fs::remove_dir_all(&out_dir).ok();
-    std::fs::create_dir_all(&out_dir).unwrap();
+    let in_dir = std::env::args_os().nth(1).unwrap();
+    let out_dir = std::env::args_os().nth(2).unwrap();
 
-    let out_file = out_dir.join("out.static");
-    let mut items = compress_merge(in_dir, &out_file);
-    items.sort_unstable_by(|a, b| a.path.cmp(&b.path));
-    // Write report
-    std::fs::write(
-        out_dir.join("report.json"),
-        &serde_json::to_vec(&items).unwrap(),
-    )
-    .unwrap();
+    let items = optimize(in_dir.as_ref(), out_dir.as_ref());
 
     // Print stats
     let max = items.iter().map(|t| t.path.len()).max().unwrap_or(0);
@@ -65,9 +53,8 @@ fn main() {
     }
     writeln!(
         &mut stdout,
-        "\n Optimized {} files to {} in {:?}",
+        "\n Optimized {} files in {:?}",
         items.len(),
-        format_size(std::fs::metadata(out_file).unwrap().len() as f32),
         start.elapsed()
     )
     .unwrap();

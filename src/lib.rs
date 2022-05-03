@@ -1,5 +1,5 @@
 use std::{
-    io::{BufWriter, Seek, SeekFrom, Write},
+    io::{BufWriter, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
 };
@@ -9,6 +9,8 @@ use hashbrown::HashMap;
 use libdeflater::{CompressionLvl, Compressor};
 use memmap2::Mmap;
 use tempfile::NamedTempFile;
+
+pub mod embeded;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Item {
@@ -42,7 +44,7 @@ impl FilesService {
     /// Create and optimized file service at runtime
     pub fn build(static_dir: impl AsRef<Path>, temp_file: impl AsRef<Path>) -> Self {
         let out = temp_file.as_ref();
-        let items = compress_merge(static_dir, out);
+        let items = compress_merge(static_dir).persist(out);
         Self::from_item_and_path(items, out)
     }
 
@@ -144,7 +146,7 @@ fn match_encoding_tag<'a>(
 
 type CompressedFile = (String, Vec<u8>, Option<Vec<u8>>, Option<Vec<u8>>);
 
-struct Accumulator {
+pub struct Accumulator {
     writer: BufWriter<NamedTempFile>,
     items: Vec<Item>,
     count: u64,
@@ -199,6 +201,16 @@ impl Accumulator {
         file.persist(path).unwrap();
         self.items
     }
+
+    pub fn into_raw(self) -> (Vec<Item>, Vec<u8>) {
+        let mut buf = Vec::new();
+        self.writer
+            .into_inner()
+            .unwrap()
+            .read_to_end(&mut buf)
+            .unwrap();
+        (self.items, buf)
+    }
 }
 
 pub fn compress(p: &Path, in_dir: &Path) -> CompressedFile {
@@ -235,13 +247,13 @@ pub fn compress(p: &Path, in_dir: &Path) -> CompressedFile {
     }
 }
 
-pub fn compress_merge(in_dir: impl AsRef<Path>, out_file: impl AsRef<Path>) -> Vec<Item> {
+pub fn compress_merge(in_dir: impl AsRef<Path>) -> Accumulator {
     let in_dir = in_dir.as_ref();
     let mut entries = Vec::new();
     walk(in_dir, &mut entries);
     let queue = StaticQueue::new(entries);
     // Parallel compression
-    let merged = crossbeam::thread::scope(|s| {
+    crossbeam::thread::scope(|s| {
         let accs: Vec<_> = (0..std::thread::available_parallelism().unwrap().get())
             .into_iter()
             .map(|_| {
@@ -261,10 +273,7 @@ pub fn compress_merge(in_dir: impl AsRef<Path>, out_file: impl AsRef<Path>) -> V
             .reduce(|a, b| a.concat(b))
             .unwrap_or_else(|| Accumulator::new())
     })
-    .unwrap();
-
-    // Persist
-    merged.persist(out_file.as_ref())
+    .unwrap()
 }
 
 /// Generate strong etag from bytes
@@ -285,3 +294,20 @@ fn walk(path: &Path, paths: &mut Vec<PathBuf>) {
         }
     }
 }
+
+pub fn optimize(in_dir: &Path, out_dir: &Path) -> Vec<Item> {
+    std::fs::remove_dir_all(&out_dir).ok();
+    std::fs::create_dir_all(&out_dir).unwrap();
+    let out_file = out_dir.join("out.static");
+    let acc = compress_merge(in_dir);
+    let mut items = acc.persist(&out_file);
+    items.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+    // Write report
+    std::fs::write(
+        out_dir.join("report.json"),
+        &serde_json::to_vec(&items).unwrap(),
+    )
+    .unwrap();
+    return items;
+}
+

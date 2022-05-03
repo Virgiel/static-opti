@@ -1,7 +1,7 @@
 use std::{io::Write, time::Instant};
 
 use mimalloc::MiMalloc;
-use static_opti::optimize;
+use static_opti::worker::optimize;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;

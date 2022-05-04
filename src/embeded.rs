@@ -11,16 +11,14 @@ pub fn codegen(path: &str, name: &str) {
     println!("cargo:rerun-if-changed={}", path);
 
     // Generate static file
-    let items = compress_dir(path).persist(&out_dir.join(format!("{name}.static")));
-    let mut file = std::fs::File::create(&out_dir.join(format!("{name}.json"))).unwrap();
-    serde_json::to_writer(&mut file, &items).unwrap();
+    compress_dir(path).persist(&out_dir.join(format!("{name}.static")));
 
     let mut rust_file =
         BufWriter::new(std::fs::File::create(&out_dir.join(format!("{name}.rs"))).unwrap());
     // Generate rust file
     writeln!(
         &mut rust_file,
-        "use static_opti::FileService;\n\npub fn static_load() -> FileService<'static> {{\n\tFileService::from_raw(include_bytes!(\"{name}.static\"),include_bytes!(\"{name}.json\"))\n}}"
+        "use static_opti::FileService;\n\npub fn static_load() -> FileService<'static> {{\n\tFileService::from_raw(include_bytes!(\"{name}.static\"))\n}}"
     )
     .unwrap();
     rust_file.into_inner().unwrap();

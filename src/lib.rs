@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{fs::File, path::Path};
 
 use hashbrown::HashMap;
 use memmap2::Mmap;
@@ -68,25 +68,22 @@ pub struct FileService<'a> {
 impl<'a> FileService<'a> {
     /// Create and optimized file service at runtime and leak its mapped content
     pub fn build(static_dir: impl AsRef<Path>) -> Self {
-        let dir = tempfile::TempDir::new().unwrap();
-        worker::optimize(static_dir.as_ref(), dir.path());
-        Self::leak(dir.path())
+        let file = tempfile::NamedTempFile::new().unwrap();
+        worker::optimize(static_dir.as_ref(), file.path());
+        Self::leak(file.as_file())
     }
 
     /// Create a file service from a dir by leaking its mapped content
-    pub fn leak(dir: &Path) -> Self {
-        let content: &'static Mmap = Box::leak(Box::new(unsafe {
-            Mmap::map(&std::fs::File::open(dir.join("out.static")).unwrap()).unwrap()
-        }));
-        let report: &'static Mmap = Box::leak(Box::new(unsafe {
-            Mmap::map(&std::fs::File::open(dir.join("report.json")).unwrap()).unwrap()
-        }));
-        Self::from_raw(content, report)
+    pub fn leak(file: &File) -> Self {
+        let content: &'static Mmap = Box::leak(Box::new(unsafe { Mmap::map(file).unwrap() }));
+        Self::from_raw(content)
     }
 
     /// Create a file service from static ressources
-    pub fn from_raw(content: &'a [u8], report: &'a [u8]) -> Self {
-        let items: Vec<ReportItem> = serde_json::from_slice(report).unwrap();
+    pub fn from_raw(content: &'a [u8]) -> Self {
+        let size = u64::from_le_bytes(content[content.len() - 8..].try_into().unwrap());
+        let bincode_part = &content[content.len() - 8 - size as usize..];
+        let items: Vec<ReportItem> = bincode::deserialize(bincode_part).unwrap();
         Self {
             map: HashMap::from_iter(
                 items

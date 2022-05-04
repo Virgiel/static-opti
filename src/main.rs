@@ -11,7 +11,7 @@ fn main() {
     let in_dir = std::env::args_os().nth(1).unwrap();
     let out_dir = std::env::args_os().nth(2).unwrap();
 
-    let items = optimize(in_dir.as_ref(), out_dir.as_ref());
+    let (_, items) = optimize(in_dir.as_ref(), out_dir.as_ref());
 
     // Print stats
     let max = items.iter().map(|t| t.path.len()).max().unwrap_or(0);

@@ -68,14 +68,15 @@ pub struct FileService<'a> {
 impl<'a> FileService<'a> {
     /// Create and optimized file service at runtime and leak its mapped content
     pub fn build(static_dir: impl AsRef<Path>) -> Self {
-        let file = tempfile::NamedTempFile::new().unwrap();
-        worker::optimize(static_dir.as_ref(), file.path());
-        Self::leak(file.as_file())
+        // Better file to have a temporary path ?   
+        let path = tempfile::NamedTempFile::new().unwrap().keep().unwrap().1;
+        let (file, _) = worker::optimize(static_dir.as_ref(), &path);
+        Self::leak(file)
     }
 
     /// Create a file service from a dir by leaking its mapped content
-    pub fn leak(file: &File) -> Self {
-        let content: &'static Mmap = Box::leak(Box::new(unsafe { Mmap::map(file).unwrap() }));
+    pub fn leak(file: File) -> Self {
+        let content: &'static Mmap = Box::leak(Box::new(unsafe { Mmap::map(&file).unwrap() }));
         Self::from_raw(content)
     }
 

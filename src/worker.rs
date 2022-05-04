@@ -1,7 +1,7 @@
 use std::{
     io::{BufWriter, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicUsize, Ordering}, fs::File,
 };
 
 use brotli::CompressorWriter;
@@ -105,15 +105,15 @@ impl Accumulator {
     }
 
     /// Persist accumulator buffer in a file, return optimized items
-    pub fn persist(mut self, path: &Path) -> Vec<Item> {
+    pub fn persist(mut self, path: &Path) -> (File, Vec<Item>) {
         let size = bincode::serialized_size(&self.items).unwrap();
         bincode::serialize_into(&mut self.writer, &self.items).unwrap();
         self.writer
             .write_all(size.to_le_bytes().as_slice())
             .unwrap();
         let file = self.writer.into_inner().unwrap();
-        file.persist(path).unwrap();
-        self.items
+        let file = file.persist(path).unwrap();
+        (file, self.items)
     }
 }
 
@@ -202,9 +202,9 @@ fn walk(path: &Path, paths: &mut Vec<PathBuf>) {
 }
 
 /// Optimize a directory into another, returning optimized items
-pub fn optimize(in_dir: &Path, out_file: &Path) -> Vec<Item> {
+pub fn optimize(in_dir: &Path, out_file: &Path) -> (File, Vec<Item>) {
     let acc = compress_dir(in_dir);
-    let mut items = acc.persist(&out_file);
+    let (file, mut items) = acc.persist(&out_file);
     items.sort_unstable_by(|a, b| a.path.cmp(&b.path));
-    return items;
+    return (file, items);
 }

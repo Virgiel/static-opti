@@ -5,20 +5,22 @@ use std::{
 
 use crate::worker::compress_dir;
 
-pub fn codegen(path: &str, name: &str) {
+/// Generates code to load a static file directory
+/// Intended use in build scripts
+pub fn codegen(static_dir: &str, file_name: &str) {
     let out = std::env::var_os("OUT_DIR").unwrap();
     let out_dir: &Path = out.as_ref();
-    println!("cargo:rerun-if-changed={}", path);
+    println!("cargo:rerun-if-changed={}", static_dir);
 
     // Generate static file
-    compress_dir(path).persist(&out_dir.join(format!("{name}.static")));
+    compress_dir(static_dir).persist(&out_dir.join(format!("{file_name}.static")));
 
-    let mut rust_file =
-        BufWriter::new(std::fs::File::create(&out_dir.join(format!("{name}.rs"))).unwrap());
     // Generate rust file
+    let mut rust_file =
+        BufWriter::new(std::fs::File::create(&out_dir.join(format!("{file_name}.rs"))).unwrap());
     writeln!(
         &mut rust_file,
-        "use static_opti::FileService;\n\npub fn static_load() -> FileService<'static> {{\n\tFileService::from_raw(include_bytes!(\"{name}.static\"))\n}}"
+        "use static_opti::FileService;\n\npub fn static_load() -> FileService<'static> {{\n\tFileService::from_raw(include_bytes!(\"{file_name}.static\"))\n}}"
     )
     .unwrap();
     rust_file.into_inner().unwrap();

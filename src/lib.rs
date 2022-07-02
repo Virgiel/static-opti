@@ -25,12 +25,15 @@ fn match_encoding_tag<'a>(
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+/// Optimized item with metadata
 pub struct ReportItem<'a> {
     pub path: &'a str,
     pub plain: (&'a str, (u64, u32)),
     pub gzip: Option<(&'a str, (u64, u32))>,
     pub brotli: Option<(&'a str, (u64, u32))>,
 }
+
+/// Optimized item
 pub struct Item<'a> {
     pub path: &'a str,
     pub plain: (&'a str, &'a [u8]),
@@ -39,7 +42,7 @@ pub struct Item<'a> {
 }
 
 impl<'a> Item<'a> {
-    pub fn from_report(item: &ReportItem<'a>, content: &'a [u8]) -> Self {
+    fn from_report(item: &ReportItem<'a>, content: &'a [u8]) -> Self {
         Self {
             path: item.path,
             plain: Self::borrow(item.plain, content),
@@ -54,33 +57,39 @@ impl<'a> Item<'a> {
     }
 }
 
+/// A static file match
 pub struct Match<'a> {
+    /// Original path
     pub path: &'a str,
+    /// Compressed content
     pub content: &'a [u8],
+    /// Precomputed ETag
     pub etag: &'a str,
+    /// Compression encoding
     pub encoding: Option<&'a str>,
 }
 
+/// Optimized static files service
 pub struct FileService<'a> {
     map: HashMap<&'a str, Item<'a>>,
 }
 
 impl<'a> FileService<'a> {
-    /// Create and optimized file service at runtime and leak its mapped content
+    /// Create and optimized file service at runtime and leak its memory mapping handle
     pub fn build(static_dir: impl AsRef<Path>) -> Self {
-        // Better file to have a temporary path ?   
+        // Better file to have a temporary path ?
         let path = tempfile::NamedTempFile::new().unwrap().keep().unwrap().1;
         let (file, _) = worker::optimize(static_dir.as_ref(), &path);
         Self::leak(file)
     }
 
-    /// Create a file service from a dir by leaking its mapped content
+    /// Create a file service from a dir by leaking its memory mapping handle
     pub fn leak(file: File) -> Self {
         let content: &'static Mmap = Box::leak(Box::new(unsafe { Mmap::map(&file).unwrap() }));
         Self::from_raw(content)
     }
 
-    /// Create a file service from static ressources
+    /// Create a file service from bytes
     pub fn from_raw(content: &'a [u8]) -> Self {
         let size = u64::from_le_bytes(content[content.len() - 8..].try_into().unwrap());
         let bincode_part = &content[content.len() - 8 - size as usize..];
@@ -97,10 +106,12 @@ impl<'a> FileService<'a> {
     /// Find a matching file
     pub fn find(&self, accept_encoding: &str, path: &str) -> Option<Match> {
         let path = path.trim_matches('/');
+        // Check path
         if let Some(it) = self.map.get(path) {
             return Some(self.match_item(accept_encoding, it));
         }
 
+        // Check /index.html or path/index.html
         {
             let path = if path == "" {
                 "index.html".to_string()
@@ -113,8 +124,8 @@ impl<'a> FileService<'a> {
             }
         }
 
+        // Check path.html
         let path = format!("{}.html", path);
-
         if let Some(it) = self.map.get(path.as_str()) {
             return Some(self.match_item(accept_encoding, it));
         }

@@ -1,7 +1,9 @@
 use std::{
+    fs::File,
     io::{BufWriter, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering}, fs::File,
+    sync::atomic::{AtomicUsize, Ordering},
+    thread,
 };
 
 use brotli::CompressorWriter;
@@ -159,12 +161,12 @@ pub fn compress_dir(dir: impl AsRef<Path>) -> Accumulator {
     walk(in_dir, &mut entries);
     let queue = StaticQueue::new(entries);
     // Parallel compression
-    crossbeam::thread::scope(|s| {
+    thread::scope(|s| {
         let accs: Vec<_> = (0..std::thread::available_parallelism().unwrap().get())
             .into_iter()
             .map(|_| {
                 let queue = &queue;
-                s.spawn(move |_| {
+                s.spawn(move || {
                     let mut acc = Accumulator::new();
                     while let Some(path) = queue.pop() {
                         acc.add(compress_file(&path, &in_dir))
@@ -179,7 +181,6 @@ pub fn compress_dir(dir: impl AsRef<Path>) -> Accumulator {
             .reduce(|a, b| a.merge(b))
             .unwrap_or_else(|| Accumulator::new())
     })
-    .unwrap()
 }
 
 /// Generate strong etag from bytes
@@ -188,20 +189,21 @@ fn etag(bytes: &[u8]) -> String {
     base64::encode_config(hash.to_le_bytes(), base64::URL_SAFE_NO_PAD)
 }
 
-/// Recursive walk of any file in a directory
+/// Recursive walk of any file in a directory whiteout following symlink dir
 fn walk(path: &Path, paths: &mut Vec<PathBuf>) {
-    for entry in std::fs::read_dir(path).unwrap() {
-        let entry = entry.unwrap();
+    for entry in std::fs::read_dir(path).expect("Failed to open dir") {
+        let entry = entry.expect("Failed to access dir entry");
         let path = entry.path();
-        if entry.file_type().unwrap().is_file() {
+        let ty = entry.file_type().expect("Failed to determine file type");
+        if ty.is_file() {
             paths.push(path);
-        } else {
+        } else if !ty.is_symlink() {
             walk(&path, paths);
         }
     }
 }
 
-/// Optimize a directory into another, returning optimized items
+/// Optimize a directory into a file, returning optimized items
 pub fn optimize(in_dir: &Path, out_file: &Path) -> (File, Vec<Item>) {
     let acc = compress_dir(in_dir);
     let (file, mut items) = acc.persist(&out_file);

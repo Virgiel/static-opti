@@ -1,17 +1,27 @@
-use std::{io::Write, time::Instant};
+use std::{io::Write, path::PathBuf, time::Instant};
 
+use clap::Parser;
 use mimalloc::MiMalloc;
 use static_opti::worker::optimize;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
+/// Prepare static files for efficient serving
+#[derive(Parser, Debug)]
+#[clap(long_about = None)]
+struct Args {
+    /// The directory containing static files
+    in_dir: PathBuf,
+    /// The path where to put the output
+    out: PathBuf,
+}
+
 fn main() {
     let start = Instant::now();
-    let in_dir = std::env::args_os().nth(1).unwrap();
-    let out_dir = std::env::args_os().nth(2).unwrap();
+    let args = Args::parse();
 
-    let (_, items) = optimize(in_dir.as_ref(), out_dir.as_ref());
+    let (_, items) = optimize(&args.in_dir, &args.out);
 
     // Print stats
     let max = items.iter().map(|t| t.path.len()).max().unwrap_or(0);

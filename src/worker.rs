@@ -3,7 +3,6 @@ use std::{
     io::{BufWriter, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
-    thread,
 };
 
 use brotli::CompressorWriter;
@@ -161,12 +160,12 @@ pub fn compress_dir(dir: impl AsRef<Path>) -> Accumulator {
     walk(in_dir, &mut entries);
     let queue = StaticQueue::new(entries);
     // Parallel compression
-    thread::scope(|s| {
+    crossbeam::scope(|s| {
         let accs: Vec<_> = (0..std::thread::available_parallelism().unwrap().get())
             .into_iter()
             .map(|_| {
                 let queue = &queue;
-                s.spawn(move || {
+                s.spawn(move |_| {
                     let mut acc = Accumulator::new();
                     while let Some(path) = queue.pop() {
                         acc.add(compress_file(&path, &in_dir))
@@ -181,6 +180,7 @@ pub fn compress_dir(dir: impl AsRef<Path>) -> Accumulator {
             .reduce(|a, b| a.merge(b))
             .unwrap_or_else(|| Accumulator::new())
     })
+    .unwrap()
 }
 
 /// Generate strong etag from bytes

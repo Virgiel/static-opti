@@ -24,6 +24,8 @@ memmap2 = "0.5"
 hashbrown = "0.12"
 # Temporary file
 tempfile = "3.3.0"
+# Until Rust 1.63
+crossbeam =  "0.8.1"
 
 # Optimal size and perf
 [profile.release]

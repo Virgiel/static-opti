@@ -8,4 +8,4 @@ static-opti = { path = ".." }
 # Small and performant allocator
 mimalloc = { version = "0.1", default-features = false }
 # CLI utils
-clap = { version = "3.2.8", features = ["derive"] }
+clap = { version = "3.2.15", features = ["derive"] }

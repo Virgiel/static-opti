@@ -36,8 +36,12 @@ fn main() {
         max + 34
     )
     .unwrap();
+    let mut plain_total = 0;
+    let mut gzip_total = 0;
+    let mut brotli_total = 0;
     for item in &items {
         let plain = item.plain.1 .1;
+        plain_total += plain;
         write!(
             &mut stdout,
             "{:<2$} {:>7}  ",
@@ -46,8 +50,12 @@ fn main() {
             max
         )
         .unwrap();
-        for opt in [&item.gzip, &item.brotli] {
+        for (opt, size) in [
+            (&item.gzip, &mut gzip_total),
+            (&item.brotli, &mut brotli_total),
+        ] {
             if let Some((_, (_, len))) = opt {
+                *size += *len;
                 write!(
                     &mut stdout,
                     "{:>7} {}%  ",
@@ -56,16 +64,27 @@ fn main() {
                 )
                 .unwrap();
             } else {
+                *size += plain;
                 write!(&mut stdout, "             ").unwrap();
             }
         }
+
         writeln!(&mut stdout, "").unwrap();
     }
     writeln!(
         &mut stdout,
-        "\n Optimized {} files in {:?}",
+        "{:-<10$}\nTotal{:<9$}{:>7}  {:>7} {}%  {:>7} {}%\nOptimized {} files in {:?}",
+        "",
+        "",
+        format_size(plain_total as f32),
+        format_size(gzip_total as f32),
+        (100 - (gzip_total * 100 / plain_total)),
+        format_size(brotli_total as f32),
+        (100 - (brotli_total * 100 / plain_total)),
         items.len(),
-        start.elapsed()
+        start.elapsed(),
+        max - 4,
+        max + 34,
     )
     .unwrap();
 }

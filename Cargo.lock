@@ -139,15 +139,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "mimalloc",
- "static-opti",
-]
-
-[[package]]
 name = "fastrand"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -360,9 +351,11 @@ dependencies = [
  "base64",
  "bincode",
  "brotli",
+ "clap",
  "hashbrown",
  "libdeflater",
  "memmap2",
+ "mimalloc",
  "serde",
  "tempfile",
  "xxhash-rust",

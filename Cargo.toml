@@ -3,9 +3,6 @@ name = "static-opti"
 version = "0.1.0"
 edition = "2021"
 
-[workspace]
-members = ["cli"]
-
 [dependencies]
 # Very fast deflate
 libdeflater = "0.10"
@@ -24,6 +21,10 @@ memmap2 = "0.5"
 hashbrown = "0.12"
 # Temporary file
 tempfile = "3.3.0"
+# Small and performant allocator
+mimalloc = { version = "0.1", default-features = false }
+# CLI utils
+clap = { version = "3.2", features = ["derive"] }
 
 # Optimal size and perf
 [profile.release]

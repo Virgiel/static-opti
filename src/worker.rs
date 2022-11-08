@@ -5,6 +5,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use brotli::CompressorWriter;
 use libdeflater::{CompressionLvl, Compressor};
 use tempfile::NamedTempFile;
@@ -185,7 +186,7 @@ pub fn compress_dir(dir: impl AsRef<Path>) -> Accumulator {
 /// Generate strong etag from bytes
 fn etag(bytes: &[u8]) -> String {
     let hash = xxhash_rust::xxh3::xxh3_128(bytes);
-    base64::encode_config(hash.to_le_bytes(), base64::URL_SAFE_NO_PAD)
+    BASE64_URL_SAFE_NO_PAD.encode(hash.to_le_bytes())
 }
 
 /// Recursive walk of any file in a directory whiteout following symlink dir

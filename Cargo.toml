@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Very fast deflate
-libdeflater = "0.11"
+libdeflater = "0.12"
 # Brotli
 brotli = "3.3"
 # Fast hash
@@ -24,7 +24,7 @@ tempfile = "3.3.0"
 # Small and performant allocator
 mimalloc = { version = "0.1", default-features = false }
 # CLI utils
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.1.2", features = ["derive"] }
 
 # Optimal size and perf
 [profile.release]

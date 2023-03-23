@@ -20,11 +20,11 @@ memmap2 = "0.5"
 # Fast hash map
 hashbrown = "0.13"
 # Temporary file
-tempfile = "3.3.0"
+tempfile = "3.4.0"
 # Small and performant allocator
 mimalloc = { version = "0.1", default-features = false }
 # CLI utils
-clap = { version = "4.1.2", features = ["derive"] }
+clap = { version = "4.1", features = ["derive"] }
 
 # Optimal size and perf
 [profile.release]

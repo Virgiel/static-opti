@@ -114,8 +114,15 @@ impl Accumulator {
             .write_all(size.to_le_bytes().as_slice())
             .unwrap();
         let file = self.writer.into_inner().unwrap();
-        let file = file.persist(path).unwrap();
-        (file, self.items)
+        match file.persist(path) {
+            Ok(it) => (it, self.items),
+            Err(mut e) => {
+                let mut other = File::create(path).unwrap();
+                e.file.rewind().unwrap();
+                std::io::copy(&mut e.file, &mut other).unwrap();
+                (other, self.items)
+            }
+        }
     }
 }
 

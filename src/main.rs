@@ -14,14 +14,14 @@ struct Args {
     /// The directory containing static files
     in_dir: PathBuf,
     /// The path where to put the output
-    out: PathBuf,
+    out: Option<PathBuf>,
 }
 
 fn main() {
     let start = Instant::now();
     let args = Args::parse();
 
-    let (_, items) = optimize(&args.in_dir, &args.out);
+    let (_, items) = optimize(&args.in_dir, args.out.as_deref());
 
     // Print stats
     let max = items.iter().map(|t| t.path.len()).max().unwrap_or(0);

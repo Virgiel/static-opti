@@ -107,21 +107,25 @@ impl Accumulator {
     }
 
     /// Persist accumulator buffer in a file, return optimized items
-    pub fn persist(mut self, path: &Path) -> (File, Vec<Item>) {
+    pub fn persist(mut self, path: Option<&Path>) -> (File, Vec<Item>) {
         let size = bincode::serialized_size(&self.items).unwrap();
         bincode::serialize_into(&mut self.writer, &self.items).unwrap();
         self.writer
             .write_all(size.to_le_bytes().as_slice())
             .unwrap();
         let file = self.writer.into_inner().unwrap();
-        match file.persist(path) {
-            Ok(it) => (it, self.items),
-            Err(mut e) => {
-                let mut other = File::create(path).unwrap();
-                e.file.rewind().unwrap();
-                std::io::copy(&mut e.file, &mut other).unwrap();
-                (other, self.items)
+        if let Some(path) = path {
+            match file.persist(path) {
+                Ok(it) => (it, self.items),
+                Err(mut e) => {
+                    let mut other = File::create(path).unwrap();
+                    e.file.rewind().unwrap();
+                    std::io::copy(&mut e.file, &mut other).unwrap();
+                    (other, self.items)
+                }
             }
+        } else {
+            (file.into_file(), self.items)
         }
     }
 }
@@ -211,9 +215,9 @@ fn walk(path: &Path, paths: &mut Vec<PathBuf>) {
 }
 
 /// Optimize a directory into a file, returning optimized items
-pub fn optimize(in_dir: &Path, out_file: &Path) -> (File, Vec<Item>) {
+pub fn optimize(in_dir: &Path, out_file: Option<&Path>) -> (File, Vec<Item>) {
     let acc = compress_dir(in_dir);
-    let (file, mut items) = acc.persist(&out_file);
+    let (file, mut items) = acc.persist(out_file);
     items.sort_unstable_by(|a, b| a.path.cmp(&b.path));
     return (file, items);
 }

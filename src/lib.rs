@@ -79,7 +79,7 @@ impl<'a> FileService<'a> {
     pub fn build(static_dir: impl AsRef<Path>) -> Self {
         // Better file to have a temporary path ?
         let path = tempfile::NamedTempFile::new().unwrap().keep().unwrap().1;
-        let (file, _) = worker::optimize(static_dir.as_ref(), &path);
+        let (file, _) = worker::optimize(static_dir.as_ref(), Some(&path));
         Self::leak(file)
     }
 

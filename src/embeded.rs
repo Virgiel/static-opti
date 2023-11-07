@@ -13,7 +13,7 @@ pub fn codegen(static_dir: &str, file_name: &str) {
     println!("cargo:rerun-if-changed={}", static_dir);
 
     // Generate static file
-    compress_dir(static_dir).persist(&out_dir.join(format!("{file_name}.static")));
+    compress_dir(static_dir).persist(Some(&out_dir.join(format!("{file_name}.static"))));
 
     // Generate rust file
     let mut rust_file =

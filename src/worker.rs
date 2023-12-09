@@ -90,7 +90,7 @@ impl Accumulator {
 
     /// Merge two accumulator
     pub fn merge(mut self, other: Self) -> Self {
-        // Copy items with new pos;
+        // Copy items with new pos
         self.items.extend(other.items.into_iter().map(|mut item| {
             item.plain.1 .0 += self.count;
             item.gzip.iter_mut().for_each(|it| it.1 .0 += self.count);
@@ -142,7 +142,16 @@ fn compress_file(file: &Path, parent: &Path) -> CompressedFile {
         .unwrap()
         .replace("\\", "/"); // Normalized path separator
 
-    if plain.is_empty() {
+    // Skip files that are unlikely to be better compressed, this is a performance optimisation
+    let skip = mime_guess::from_path(file)
+        .first()
+        .map(|m| {
+            ["image", "audio", "video"].contains(&m.type_().as_str())
+                && m.subtype().as_str() != "svg"
+        })
+        .unwrap_or(false);
+
+    if plain.is_empty() || skip {
         (path, plain, None, None)
     } else {
         // Gzip compress

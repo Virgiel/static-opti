@@ -25,6 +25,7 @@ tempfile = "3.8.1"
 mimalloc = { version = "0.1", default-features = false }
 # CLI utils
 clap = { version = "4.4", features = ["derive"] }
+mime_guess = "2"
 
 # Optimal size and perf
 [profile.release]

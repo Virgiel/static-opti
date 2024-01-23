@@ -20,7 +20,7 @@ memmap2 = "0.9"
 # Fast hash map
 hashbrown = "0.14"
 # Temporary file
-tempfile = "3.8.1"
+tempfile = "3.9.0"
 # Small and performant allocator
 mimalloc = { version = "0.1", default-features = false }
 # CLI utils

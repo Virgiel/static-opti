@@ -95,7 +95,7 @@ impl Accumulator {
             item.plain.1 .0 += self.count;
             item.gzip.iter_mut().for_each(|it| it.1 .0 += self.count);
             item.brotli.iter_mut().for_each(|it| it.1 .0 += self.count);
-            return item;
+            item
         }));
         // Copy other file from start
         let mut file = other.writer.into_inner().unwrap();
@@ -103,7 +103,7 @@ impl Accumulator {
         std::io::copy(&mut file, &mut self.writer).unwrap();
         // Increment count
         self.count += other.count;
-        return self;
+        self
     }
 
     /// Persist accumulator buffer in a file, return optimized items
@@ -133,14 +133,14 @@ impl Accumulator {
 /// Compress a file;
 fn compress_file(file: &Path, parent: &Path) -> CompressedFile {
     // Read plain file
-    let plain = std::fs::read(&file).unwrap();
+    let plain = std::fs::read(file).unwrap();
     // Format path
     let path = file
         .strip_prefix(parent)
         .unwrap()
         .to_str()
         .unwrap()
-        .replace("\\", "/"); // Normalized path separator
+        .replace('\\', "/"); // Normalized path separator
 
     // Skip files that are unlikely to be better compressed, this is a performance optimisation
     let skip = mime_guess::from_path(file)
@@ -160,7 +160,7 @@ fn compress_file(file: &Path, parent: &Path) -> CompressedFile {
         let mut gzip = vec![0; max_size];
         let gzip_size = compressor.gzip_compress(&plain, &mut gzip).unwrap();
         gzip.resize(gzip_size, 0);
-        let gzip = (gzip.len() * 100 / plain.len() < 90).then(|| gzip);
+        let gzip = (gzip.len() * 100 / plain.len() < 90).then_some(gzip);
 
         // Brotli compress
         let mut brotli = Vec::new();
@@ -168,7 +168,7 @@ fn compress_file(file: &Path, parent: &Path) -> CompressedFile {
         writer.write_all(&plain).unwrap();
         writer.flush().unwrap();
         writer.into_inner();
-        let brotli = (brotli.len() * 100 / plain.len() < 90).then(|| brotli);
+        let brotli = (brotli.len() * 100 / plain.len() < 90).then_some(brotli);
 
         (path, plain, gzip, brotli)
     }
@@ -183,15 +183,14 @@ pub fn compress_dir(dir: impl AsRef<Path>) -> Accumulator {
     // Parallel compression
     std::thread::scope(|s| {
         let accs: Vec<_> = (0..std::thread::available_parallelism().unwrap().get())
-            .into_iter()
             .map(|_| {
                 let queue = &queue;
                 s.spawn(|| {
                     let mut acc = Accumulator::new();
                     while let Some(path) = queue.pop() {
-                        acc.add(compress_file(&path, &in_dir))
+                        acc.add(compress_file(path, in_dir))
                     }
-                    return acc;
+                    acc
                 })
             })
             .collect();
@@ -199,7 +198,7 @@ pub fn compress_dir(dir: impl AsRef<Path>) -> Accumulator {
         accs.into_iter()
             .map(|it| it.join().unwrap())
             .reduce(|a, b| a.merge(b))
-            .unwrap_or_else(|| Accumulator::new())
+            .unwrap_or_else(Accumulator::new)
     })
 }
 
@@ -228,5 +227,5 @@ pub fn optimize(in_dir: &Path, out_file: Option<&Path>) -> (File, Vec<Item>) {
     let acc = compress_dir(in_dir);
     let (file, mut items) = acc.persist(out_file);
     items.sort_unstable_by(|a, b| a.path.cmp(&b.path));
-    return (file, items);
+    (file, items)
 }

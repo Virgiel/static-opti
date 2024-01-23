@@ -69,7 +69,7 @@ fn main() {
             }
         }
 
-        writeln!(&mut stdout, "").unwrap();
+        writeln!(&mut stdout).unwrap();
     }
     writeln!(
         &mut stdout,
@@ -98,5 +98,5 @@ fn format_size(mut size: f32) -> String {
             size /= 1024.;
         }
     }
-    return format!("{:.1}TB", size);
+    format!("{:.1}TB", size)
 }

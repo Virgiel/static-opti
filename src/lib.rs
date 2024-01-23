@@ -113,7 +113,7 @@ impl<'a> FileService<'a> {
 
         // Check /index.html or path/index.html
         {
-            let path = if path == "" {
+            let path = if path.is_empty() {
                 "index.html".to_string()
             } else {
                 format!("{}/index.html", path)
@@ -130,14 +130,14 @@ impl<'a> FileService<'a> {
             return Some(self.match_item(accept_encoding, it));
         }
 
-        return None;
+        None
     }
 
     /// Construct match from an item and an accept encoding header value
     fn match_item(&self, accept_encoding: &str, item: &Item<'a>) -> Match {
         let (encoding, (etag, content)) = match_encoding_tag(accept_encoding, item);
         Match {
-            path: &item.path,
+            path: item.path,
             content,
             etag,
             encoding,

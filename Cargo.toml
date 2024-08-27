@@ -7,11 +7,11 @@ edition = "2021"
 # Very fast deflate
 libdeflater = "1.19"
 # Brotli
-brotli = "3.4"
+brotli = "6.0"
 # Fast hash
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
-# Fast base 6n
-base64 = "0.21"
+# Fast base 64
+base64 = "0.22"
 # JSON
 serde = { version = "1.0", features = ["derive"] }
 bincode = "1.3.3"

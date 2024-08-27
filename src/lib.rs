@@ -11,11 +11,11 @@ fn match_encoding_tag<'a>(
     accept_encoding: &str,
     item: &Item<'a>,
 ) -> (Option<&'static str>, (&'a str, &'a [u8])) {
-    if let Some(it) = &item.brotli {
+    /*if let Some(it) = &item.brotli {
         if accept_encoding.contains("br") {
             return (Some("br"), *it);
         }
-    }
+    }*/
     if let Some(it) = &item.gzip {
         if accept_encoding.contains("gzip") {
             return (Some("gzip"), *it);

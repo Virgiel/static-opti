@@ -19,7 +19,7 @@ bincode = "1.3.3"
 memmap2 = "0.9"
 # Fast hash map
 hashbrown = "0.14"
-# Temporary file
+# Temporary file 
 tempfile = "3.9.0"
 # Small and performant allocator
 mimalloc = { version = "0.1", default-features = false }
